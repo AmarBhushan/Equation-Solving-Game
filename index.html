@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeniusHub Equation Solver</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+            color: #1e293b; /* slate-800 */
+            overscroll-behavior: none;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        button, select, input, textarea {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.05);
+        }
+
+        /* Timeline styles */
+        .timeline-line {
+            position: absolute;
+            left: 1.5rem;
+            top: 2.5rem;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(99, 102, 241, 0.2); /* indigo-500/20 */
+            z-index: 0;
+        }
+
+        /* Term Selection Animation */
+        .term-selected {
+            border-color: #818cf8 !important; /* indigo-400 */
+            background-color: rgba(224, 231, 255, 0.6) !important; /* indigo-100 */
+            box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+            transform: scale(1.02);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        /* Hide scrollbar for horizontally scrolling math containers */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-2 sm:p-6 overflow-x-hidden selection:bg-indigo-200 selection:text-indigo-900">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none"></div>
+
+    <!-- Decorative Background Orbs -->
+    <div class="fixed inset-0 z-0 flex justify-center items-center overflow-hidden pointer-events-none">
+        <div class="absolute w-[800px] h-[800px] bg-indigo-200/40 rounded-full blur-[120px] -top-40 -left-40"></div>
+        <div class="absolute w-[600px] h-[600px] bg-teal-200/40 rounded-full blur-[100px] bottom-10 right-0"></div>
+    </div>
+
+    <main class="relative z-10 w-full max-w-5xl flex flex-col h-full gap-4">
+        
+        <!-- ================= SETUP VIEW ================= -->
+        <div id="view-setup" class="glass rounded-3xl p-6 sm:p-8 text-center w-full max-w-lg mx-auto mt-4 sm:mt-10 transition-all">
+            <div class="mb-6 sm:mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-indigo-100 to-teal-100 text-indigo-500 mb-4 shadow-sm border border-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight mb-1 sm:mb-2">GeniusHub</h1>
+                <p class="text-slate-500 font-medium text-sm sm:text-base">Interactive Step-by-Step Solver</p>
+            </div>
+
+            <div class="bg-slate-50/50 p-4 sm:p-5 rounded-2xl border border-slate-200/50 relative text-left space-y-3 sm:space-y-4">
+                <label for="eq-input" class="block text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-wider mb-1 sm:mb-2">Enter your equation:</label>
+                <input type="text" id="eq-input" placeholder="e.g. (3x - 2)/4 = 5" 
+                       class="w-full bg-white border-2 border-slate-200 rounded-xl px-3 sm:px-4 py-3 text-lg sm:text-xl font-mono text-slate-800 shadow-sm focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 transition-all"
+                       value="(3x - 2)/4 = 5">
+                <p class="text-[10px] sm:text-xs text-slate-500 mt-2">Supports variables, grouped fractions like (2x-1)/3, and decimals.</p>
+                <button onclick="parseAndStart()" class="w-full mt-3 sm:mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md shadow-indigo-500/20 transition-all text-lg sm:text-xl transform hover:-translate-y-0.5 active:translate-y-0">
+                    Start Solving
+                </button>
+                <p id="setup-error" class="text-rose-500 text-sm font-bold hidden mt-4"></p>
+            </div>
+        </div>
+
+        <!-- ================= WORKSPACE VIEW ================= -->
+        <div id="view-workspace" class="hidden flex-col w-full h-full gap-3 sm:gap-4 pb-10">
+            
+            <!-- Header -->
+            <div class="glass rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center shrink-0 gap-3 sm:gap-0">
+                <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-hidden">
+                    <button onclick="showSetup()" class="shrink-0 bg-white hover:bg-slate-50 text-slate-600 p-2 rounded-lg transition-colors border border-slate-200 shadow-sm" title="Back to Setup">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </button>
+                    <div class="flex items-center gap-2 overflow-hidden flex-1">
+                        <span class="hidden sm:inline text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">Original:</span>
+                        <div class="overflow-x-auto no-scrollbar w-full">
+                            <h2 id="workspace-title" class="text-xs sm:text-sm md:text-lg font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 sm:px-3 rounded-md border border-slate-200 shadow-inner whitespace-nowrap inline-block"></h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <button id="btn-undo" onclick="executeUndo()" disabled class="bg-amber-50 hover:bg-amber-100 text-amber-600 disabled:opacity-50 disabled:cursor-not-allowed font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-amber-200 text-xs sm:text-sm transition-colors flex items-center gap-1 sm:gap-2 shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                        <span class="hidden sm:inline">Undo</span>
+                    </button>
+                    <button onclick="resetEquation()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-indigo-200 text-xs sm:text-sm transition-colors flex items-center gap-1 sm:gap-2 shadow-sm">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Equation Board (Balance Machine) -->
+            <div class="glass rounded-3xl p-3 sm:p-8 flex flex-col items-center justify-center relative shrink-0 border-t-4 border-t-indigo-400 shadow-sm overflow-visible z-10">
+                <p class="text-slate-500 font-bold text-[10px] sm:text-xs uppercase tracking-widest mb-2 bg-slate-100/50 px-3 py-1 rounded-full border border-slate-200/50 backdrop-blur-sm z-20">Equation Balance</p>
+                
+                <div class="relative w-full max-w-4xl pt-4 sm:pt-8 pb-2 sm:pb-4">
+                    
+                    <!-- Physical Balance Scale Graphic (Desktop) -->
+                    <div class="absolute inset-0 pointer-events-none hidden md:block z-0">
+                        <!-- Center Pole -->
+                        <div class="absolute left-1/2 -translate-x-1/2 top-4 bottom-[-1.5rem] w-4 bg-gradient-to-r from-slate-200 via-white to-slate-300 rounded-full shadow-[inset_0_0_5px_rgba(0,0,0,0.05)] border-x border-slate-200"></div>
+                        <!-- Base -->
+                        <div class="absolute left-1/2 -translate-x-1/2 bottom-[-2rem] w-48 h-10 bg-gradient-to-b from-slate-200 to-slate-300 rounded-t-[2rem] shadow-md border-b-4 border-slate-400 flex items-center justify-center"><div class="w-32 h-1 bg-slate-400/30 rounded-full mt-2"></div></div>
+                        <!-- Crossbeam -->
+                        <div class="absolute left-[15%] right-[15%] top-8 h-4 bg-gradient-to-b from-slate-100 to-slate-300 rounded-full shadow-[0_4px_6px_rgba(0,0,0,0.05)] border border-slate-300 flex justify-between items-center px-1 z-10">
+                            <div class="w-3 h-3 rounded-full bg-slate-400 shadow-inner border border-slate-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-slate-400 shadow-inner border border-slate-500"></div>
+                        </div>
+                        <!-- Pivot point -->
+                        <div class="absolute left-1/2 -translate-x-1/2 top-6 w-8 h-8 rounded-full bg-white border-4 border-indigo-200 shadow-md z-20 flex items-center justify-center"><div class="w-2 h-2 rounded-full bg-indigo-400"></div></div>
+                    </div>
+
+                    <!-- Content Area (The Pans) -->
+                    <div class="flex flex-col md:flex-row items-stretch justify-center gap-6 md:gap-8 lg:gap-16 w-full relative z-10 mt-2 md:mt-12">
+                        
+                        <!-- LHS Pan -->
+                        <div class="flex-1 flex flex-col items-center w-full group min-w-0">
+                            <!-- Strings connecting to beam -->
+                            <svg class="hidden md:block w-40 h-16 text-slate-400 -mt-8 opacity-70" viewBox="0 0 100 50" preserveAspectRatio="none">
+                                <line x1="50" y1="0" x2="5" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="50" y1="0" x2="95" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            
+                            <div class="w-full bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl border-x border-t border-slate-200 border-b-8 sm:border-b-[14px] border-b-slate-300 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col items-center relative md:-mt-1 transition-transform duration-300 group-hover:translate-y-0 md:group-hover:-translate-y-1">
+                                <div class="absolute -top-3 sm:-top-5 bg-indigo-50 text-indigo-700 font-black text-[10px] sm:text-sm uppercase tracking-widest px-4 sm:px-6 py-1 sm:py-2 rounded-full shadow-sm border border-indigo-200 z-10">LHS</div>
+                                <div id="lhs-zone" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 min-h-[80px] sm:min-h-[140px] p-3 sm:p-6 w-full pt-6 sm:pt-10 overflow-x-auto no-scrollbar"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Equals Sign Pivot -->
+                        <div class="flex flex-col items-center justify-center self-center my-1 md:my-0 z-20 md:translate-y-4 shrink-0">
+                            <div class="w-10 h-10 sm:w-14 sm:h-14 bg-white rounded-full shadow-lg border-2 sm:border-4 border-slate-100 flex items-center justify-center relative text-slate-400 font-black text-2xl sm:text-3xl">
+                                =
+                            </div>
+                        </div>
+                        
+                        <!-- RHS Pan -->
+                        <div class="flex-1 flex flex-col items-center w-full group min-w-0">
+                            <!-- Strings connecting to beam -->
+                            <svg class="hidden md:block w-40 h-16 text-slate-400 -mt-8 opacity-70" viewBox="0 0 100 50" preserveAspectRatio="none">
+                                <line x1="50" y1="0" x2="5" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="50" y1="0" x2="95" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            
+                            <div class="w-full bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl border-x border-t border-slate-200 border-b-8 sm:border-b-[14px] border-b-slate-300 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col items-center relative md:-mt-1 transition-transform duration-300 group-hover:translate-y-0 md:group-hover:-translate-y-1">
+                                <div class="absolute -top-3 sm:-top-5 bg-teal-50 text-teal-700 font-black text-[10px] sm:text-sm uppercase tracking-widest px-4 sm:px-6 py-1 sm:py-2 rounded-full shadow-sm border border-teal-200 z-10">RHS</div>
+                                <div id="rhs-zone" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 min-h-[80px] sm:min-h-[140px] p-3 sm:p-6 w-full pt-6 sm:pt-10 overflow-x-auto no-scrollbar"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Toolbar -->
+            <div class="glass rounded-2xl p-3 sm:p-6 flex flex-col gap-3 sm:gap-4 shrink-0 bg-white/80 shadow-sm">
+                <p class="text-slate-500 font-bold text-xs sm:text-sm uppercase tracking-wider border-b border-slate-100 pb-1 sm:pb-2">Choose an Action</p>
+                
+                <div class="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch lg:items-center justify-between">
+                    
+                    <!-- Direct Term Actions -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                        <button id="btn-move" onclick="executeMove()" disabled class="w-full bg-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:border disabled:cursor-not-allowed hover:bg-indigo-600 text-white font-bold py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                            <span class="truncate">Move Term</span>
+                        </button>
+                        <button onclick="executeCombine()" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            <span class="truncate">Combine Terms</span>
+                        </button>
+                        <button onclick="executeExpand()" class="w-full bg-amber-400 hover:bg-amber-500 text-amber-900 font-bold py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                            <span class="truncate">Expand</span>
+                        </button>
+                    </div>
+
+                    <div class="hidden lg:block w-px h-12 bg-slate-200"></div>
+
+                    <!-- Whole Equation Operations -->
+                    <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-slate-50 p-2 rounded-xl border border-slate-200 justify-center">
+                        <div class="flex gap-2">
+                            <select id="op-select" class="flex-1 sm:flex-none bg-white border border-slate-300 text-slate-700 font-bold rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 shadow-sm">
+                                <option value="+">Add (+)</option>
+                                <option value="-">Subtract (-)</option>
+                                <option value="*">Multiply (×)</option>
+                                <option value="/">Divide (÷)</option>
+                            </select>
+                            <input type="text" id="op-val" placeholder="Num or a/b" class="w-20 sm:w-28 bg-white border border-slate-300 text-slate-800 font-mono font-bold rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 text-center shadow-sm" value="4">
+                        </div>
+                        <button onclick="executeOperation()" class="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-sm text-sm sm:text-base">
+                            Apply to Both Sides
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Success Banner -->
+            <div id="success-banner" class="hidden glass bg-emerald-50/80 border-2 border-emerald-400 p-6 rounded-2xl text-center shadow-[0_4px_20px_rgba(52,211,153,0.3)] animate-pulse">
+                <h3 class="text-2xl font-black text-emerald-600 mb-1">Equation Solved!</h3>
+                <p class="text-emerald-700">Great job applying the correct operations.</p>
+            </div>
+
+            <!-- Step-by-Step History Timeline -->
+            <div class="glass rounded-3xl p-6 shadow-sm flex-1 relative min-h-[300px]">
+                <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-200 pb-3">Step-by-Step Working</h3>
+                <div class="timeline-line"></div>
+                <div id="history-container" class="space-y-6 relative z-10 pl-2">
+                    <!-- History injected here -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Math Helpers (Fraction Engine) ---
+        const Frac = {
+            create: (n, d = 1) => {
+                if (d === 0) return {n:0, d:1};
+                let sign = (n < 0) !== (d < 0) ? -1 : 1;
+                n = Math.abs(n);
+                d = Math.abs(d);
+                let g = Frac.gcd(n, d);
+                return { n: sign * (n / g), d: d / g };
+            },
+            gcd: (a, b) => b === 0 ? a : Frac.gcd(b, a % b),
+            add: (a, b) => Frac.create(a.n * b.d + b.n * a.d, a.d * b.d),
+            sub: (a, b) => Frac.create(a.n * b.d - b.n * a.d, a.d * b.d),
+            mul: (a, b) => Frac.create(a.n * b.n, a.d * b.d),
+            div: (a, b) => Frac.create(a.n * b.d, a.d * b.n),
+            parse: (str) => {
+                str = str.replace(/[\s$₹£€,]/g, ''); // Strip spaces, commas, and currency symbols
+                if (!str || str === '+' || str === '-') return Frac.create(str === '-' ? -1 : 1, 1);
+                if (str.includes('/')) {
+                    let parts = str.split('/');
+                    let n = parseFloat(parts[0]), d = parseFloat(parts[1]);
+                    if (isNaN(n) || isNaN(d)) return null;
+                    return Frac.create(n, d);
+                }
+                if (str.includes('.')) {
+                    let decParts = str.split('.');
+                    let d = Math.pow(10, decParts[1].length);
+                    let n = parseInt(str.replace('.', ''), 10);
+                    if (isNaN(n)) return null;
+                    return Frac.create(n, d);
+                }
+                let val = parseFloat(str);
+                return isNaN(val) ? null : Frac.create(val, 1);
+            },
+            abs: (f) => ({ n: Math.abs(f.n), d: f.d }),
+            toHTML: (f) => {
+                let absF = Frac.abs(f);
+                let sign = f.n < 0 ? "−" : "";
+                if (absF.d === 1) return sign + absF.n;
+                return `${sign}<span class="inline-flex flex-col items-center justify-center align-middle mx-1 text-[0.8em] leading-none font-bold">
+                            <span class="border-b-2 border-current px-1 pb-[2px]">${absF.n}</span>
+                            <span class="pt-[2px]">${absF.d}</span>
+                        </span>`;
+            }
+        };
+
+        // --- Application State ---
+        let state = {
+            lhs: [], 
+            rhs: [],
+            originalLhs: [],
+            originalRhs: [],
+            originalEquationStr: "",
+            history: [],
+            selectedTermIds: [],
+            stepCounter: 0
+        };
+
+        // --- DOM Elements ---
+        const views = {
+            setup: document.getElementById('view-setup'),
+            workspace: document.getElementById('view-workspace')
+        };
+        const ui = {
+            input: document.getElementById('eq-input'),
+            error: document.getElementById('setup-error'),
+            lhsZone: document.getElementById('lhs-zone'),
+            rhsZone: document.getElementById('rhs-zone'),
+            btnMove: document.getElementById('btn-move'),
+            btnUndo: document.getElementById('btn-undo'),
+            historyContainer: document.getElementById('history-container'),
+            opSelect: document.getElementById('op-select'),
+            opVal: document.getElementById('op-val'),
+            successBanner: document.getElementById('success-banner')
+        };
+
+        // --- View Management ---
+        function switchView(viewName) {
+            Object.values(views).forEach(v => {
+                v.classList.add('hidden');
+                v.classList.remove('flex');
+            });
+            if (viewName === 'workspace') {
+                views[viewName].classList.remove('hidden');
+                views[viewName].classList.add('flex');
+            } else {
+                views[viewName].classList.remove('hidden');
+            }
+        }
+
+        function showSetup() { 
+            switchView('setup'); 
+        }
+
+        // --- Custom Toast Notification ---
+        function showToast(msg) {
+            let container = document.getElementById('toast-container');
+            let toast = document.createElement('div');
+            toast.className = 'bg-rose-500/95 backdrop-blur-md text-white px-6 py-3 rounded-xl shadow-2xl font-bold transition-all duration-300 transform -translate-y-4 opacity-0 border border-rose-400 text-center text-sm';
+            toast.textContent = msg;
+            container.appendChild(toast);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.classList.remove('-translate-y-4', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- Core Parsing Logic ---
+        function generateId() { return 'term_' + Math.random().toString(36).substr(2, 9); }
+
+        function splitTerms(str) {
+            let terms = [];
+            let currentTerm = "";
+            let depth = 0;
+            str = str.replace(/\s+/g, '');
+            if (str[0] !== '+' && str[0] !== '-') str = '+' + str;
+            
+            for (let i = 0; i < str.length; i++) {
+                let char = str[i];
+                if (char === '(') depth++;
+                else if (char === ')') depth--;
+                
+                if ((char === '+' || char === '-') && depth === 0 && i !== 0) {
+                    terms.push(currentTerm);
+                    currentTerm = char;
+                } else {
+                    currentTerm += char;
+                }
+            }
+            if (currentTerm) terms.push(currentTerm);
+            return terms;
+        }
+
+        function parseNormalTerm(str) {
+            let match = str.match(/^([+-]?.*?)([a-zA-Z]*)$/);
+            if (!match) return null;
+            let coeffStr = match[1].trim();
+            let varStr = match[2] || null;
+            let parsed = Frac.parse(coeffStr);
+            if (parsed) return { id: generateId(), type: 'normal', coeff: parsed, var: varStr };
+            return null;
+        }
+
+        function parseTerm(str) {
+            str = str.trim();
+            // Match grouped logic: e.g. +(3x-2)/4
+            let groupMatch = str.match(/^([+-]?)([\d./]*)\((.*)\)(?:\/([\d.]+))?$/);
+            if (groupMatch) {
+                let signStr = groupMatch[1];
+                let multStr = groupMatch[2];
+                let innerStr = groupMatch[3];
+                let divStr = groupMatch[4];
+
+                let mult = Frac.parse(multStr || '1');
+                if (signStr === '-') mult = Frac.mul(mult, Frac.create(-1));
+                let div = Frac.parse(divStr || '1');
+                let factor = Frac.div(mult, div);
+
+                let innerTermStrs = splitTerms(innerStr);
+                let innerTerms = innerTermStrs.map(t => parseNormalTerm(t)).filter(t => t !== null);
+
+                return { id: generateId(), type: 'group', factor: factor, innerTerms: innerTerms };
+            }
+            return parseNormalTerm(str);
+        }
+
+        function parseSide(str) {
+            if (!str) return [];
+            let termStrs = splitTerms(str);
+            let terms = [];
+            termStrs.forEach(tStr => {
+                let t = parseTerm(tStr);
+                if (t) terms.push(t);
+            });
+            return terms;
+        }
+
+        function parseAndStart() {
+            ui.error.classList.add('hidden');
+            let rawEq = ui.input.value.replace(/--/g, '+').replace(/\+-/g, '-');
+            const parts = rawEq.split('=');
+            
+            if (parts.length !== 2 || parts[0] === "" || parts[1] === "") {
+                ui.error.textContent = "Please enter a valid equation with one '=' sign.";
+                ui.error.classList.remove('hidden');
+                return;
+            }
+
+            state.lhs = parseSide(parts[0]);
+            state.rhs = parseSide(parts[1]);
+            state.originalLhs = JSON.parse(JSON.stringify(state.lhs));
+            state.originalRhs = JSON.parse(JSON.stringify(state.rhs));
+            state.history = [];
+            state.stepCounter = 0;
+            state.selectedTermIds = [];
+
+            state.originalEquationStr = formatEquation();
+            document.getElementById('workspace-title').innerHTML = state.originalEquationStr;
+
+            addHistoryRecord("Original Equation");
+            switchView('workspace');
+            updateUI();
+        }
+
+        // --- Formatting & Text Generation ---
+        function formatTermPlain(term, isFirst) {
+            if (term.type === 'normal') {
+                let isNeg = term.coeff.n < 0;
+                let signStr = isNeg ? (isFirst ? '−' : ' − ') : (isFirst ? '' : ' + ');
+                let absF = Frac.abs(term.coeff);
+                let showCoeff = !(absF.n === 1 && absF.d === 1 && term.var);
+                let valHTML = "";
+                
+                if (showCoeff) {
+                    if (absF.d === 1) valHTML += absF.n;
+                    else valHTML += `<div class="inline-flex flex-col items-center justify-center align-middle mx-[2px] text-[0.7em] leading-none"><span class="border-b-[1.5px] border-current px-1 pb-px">${absF.n}</span><span class="pt-px">${absF.d}</span></div>`;
+                }
+                if (term.var) valHTML += `<span class="ml-px">${term.var}</span>`;
+                if (absF.n === 0 && !term.var) { signStr = ""; valHTML = "0"; }
+                
+                return signStr + valHTML;
+            } else if (term.type === 'group') {
+                let isNeg = term.factor.n < 0;
+                let signStr = isNeg ? (isFirst ? '−' : ' − ') : (isFirst ? '' : ' + ');
+                let absF = Frac.abs(term.factor);
+                let innerHTML = term.innerTerms.map((t, i) => formatTermPlain(t, i === 0)).join('');
+                
+                let valHTML = "";
+                if (absF.d === 1) {
+                    let multStr = absF.n !== 1 ? absF.n : '';
+                    valHTML = `${multStr}(${innerHTML})`;
+                } else {
+                    let multStr = absF.n !== 1 ? absF.n : '';
+                    valHTML = `<div class="inline-flex flex-col items-center justify-center align-middle mx-1">
+                                    <span class="border-b-[1.5px] border-current px-2 pb-1">${multStr}(${innerHTML})</span>
+                                    <span class="pt-1">${absF.d}</span>
+                               </div>`;
+                }
+                return signStr + valHTML;
+            }
+        }
+
+        function formatSide(sideArray) {
+            if (sideArray.length === 0) return "0";
+            return sideArray.map((t, i) => formatTermPlain(t, i === 0)).join("");
+        }
+
+        function formatEquation() {
+            return `${formatSide(state.lhs)} <span class="mx-3 text-indigo-500">=</span> ${formatSide(state.rhs)}`;
+        }
+
+        function formatSideWithStrikethrough(sideArray, idsToStrike) {
+            if (sideArray.length === 0) return "0";
+            return sideArray.map((t, i) => {
+                let termHTML = formatTermPlain(t, i === 0);
+                if (idsToStrike.includes(t.id)) {
+                    return `<span class="line-through decoration-rose-500 decoration-2 text-slate-400 opacity-80">${termHTML}</span>`;
+                }
+                return termHTML;
+            }).join("");
+        }
+
+        function formatEquationWithStrikethrough(idsToStrike) {
+            return `${formatSideWithStrikethrough(state.lhs, idsToStrike)} <span class="mx-3 text-indigo-500">=</span> ${formatSideWithStrikethrough(state.rhs, idsToStrike)}`;
+        }
+
+        // --- Actions & Operations ---
+        function selectTerm(id) {
+            const index = state.selectedTermIds.indexOf(id);
+            if (index > -1) state.selectedTermIds.splice(index, 1);
+            else state.selectedTermIds.push(id);
+            updateUI();
+        }
+
+        function executeMove() {
+            if (state.selectedTermIds.length === 0) return;
+            
+            [...state.selectedTermIds].forEach(id => {
+                let fromSide = 'lhs', toSide = 'rhs';
+                let termIndex = state.lhs.findIndex(t => t.id === id);
+                
+                if (termIndex === -1) {
+                    termIndex = state.rhs.findIndex(t => t.id === id);
+                    fromSide = 'rhs'; toSide = 'lhs';
+                }
+                if (termIndex === -1) return;
+
+                let term = state[fromSide][termIndex];
+                state[fromSide].splice(termIndex, 1);
+                
+                if (term.type === 'normal') {
+                    term.coeff = Frac.create(-term.coeff.n, term.coeff.d);
+                } else {
+                    term.factor = Frac.create(-term.factor.n, term.factor.d);
+                }
+                
+                state[toSide].push(term);
+            });
+
+            addHistoryRecord(`Moved term(s) across '=' and inverted sign.`);
+            state.selectedTermIds = [];
+            updateUI();
+        }
+
+        function executeExpand() {
+            let expandSide = (side) => {
+                let newSide = [];
+                let expandedCount = 0;
+                side.forEach(t => {
+                    if (t.type === 'group') {
+                        expandedCount++;
+                        t.innerTerms.forEach(it => {
+                            let newCoeff = Frac.mul(it.coeff, t.factor);
+                            newSide.push({ id: generateId(), type: 'normal', coeff: newCoeff, var: it.var });
+                        });
+                    } else {
+                        newSide.push(t);
+                    }
+                });
+                return { newSide, expandedCount };
+            };
+            
+            let lhsRes = expandSide(state.lhs);
+            let rhsRes = expandSide(state.rhs);
+            
+            if (lhsRes.expandedCount > 0 || rhsRes.expandedCount > 0) {
+                // Strike through the expanded groups for history display
+                let idsToStrike = state.lhs.filter(t => t.type === 'group').map(t => t.id)
+                    .concat(state.rhs.filter(t => t.type === 'group').map(t => t.id));
+                let intermediateHTML = formatEquationWithStrikethrough(idsToStrike);
+
+                state.lhs = lhsRes.newSide;
+                state.rhs = rhsRes.newSide;
+                addHistoryRecord("Expanded brackets using distributive property.", intermediateHTML);
+                updateUI();
+            }
+        }
+
+        function executeCombine() {
+            if (state.selectedTermIds.length < 2) {
+                return showToast("Please select at least two terms to combine by tapping them.");
+            }
+
+            let selectedLHS = state.lhs.filter(t => state.selectedTermIds.includes(t.id));
+            let selectedRHS = state.rhs.filter(t => state.selectedTermIds.includes(t.id));
+
+            if (selectedLHS.length > 0 && selectedRHS.length > 0) {
+                return showToast("Cannot combine terms across the '=' sign. Move them to the same side first.");
+            }
+
+            let activeSide = selectedLHS.length > 0 ? 'lhs' : 'rhs';
+            let selectedTerms = selectedLHS.length > 0 ? selectedLHS : selectedRHS;
+
+            let firstTerm = selectedTerms[0];
+            if (firstTerm.type === 'group' || selectedTerms.some(t => t.type === 'group')) {
+                return showToast("Please expand grouped brackets before combining.");
+            }
+
+            let targetVar = firstTerm.var;
+            let allLike = selectedTerms.every(t => t.type === 'normal' && t.var === targetVar);
+            if (!allLike) {
+                return showToast("Please select like terms (they must have the exact same variable).");
+            }
+
+            // Create intermediate strike-through HTML for notebook effect
+            let intermediateHTML = formatEquationWithStrikethrough(state.selectedTermIds);
+
+            // Calculate the sum
+            let sumCoeff = Frac.create(0);
+            selectedTerms.forEach(t => sumCoeff = Frac.add(sumCoeff, t.coeff));
+
+            // Remove selected terms and add combined term
+            state[activeSide] = state[activeSide].filter(t => !state.selectedTermIds.includes(t.id));
+
+            if (sumCoeff.n !== 0) {
+                state[activeSide].push({ id: generateId(), type: 'normal', coeff: sumCoeff, var: targetVar });
+            } else if (state[activeSide].length === 0) {
+                state[activeSide].push({ id: generateId(), type: 'normal', coeff: Frac.create(0), var: null });
+            }
+
+            addHistoryRecord("Combined like terms.", intermediateHTML);
+            state.selectedTermIds = [];
+            updateUI();
+        }
+
+        function executeOperation() {
+            let op = ui.opSelect.value;
+            let valStr = ui.opVal.value;
+            let valFrac = Frac.parse(valStr);
+            
+            if (!valFrac) return showToast("Please enter a valid number or fraction (e.g. 4, 1.5, or 3/4).");
+            if (valFrac.n === 0 && (op === '*' || op === '/')) return showToast("Cannot multiply/divide by zero.");
+
+            let intermediateHTML = null;
+            if (op === '*' || op === '/') {
+                // Show notebook style cancellation for multiplication/division
+                let opChar = op === '*' ? '×' : '÷';
+                let opStr = `<span class="line-through decoration-rose-500 decoration-2 text-rose-500 opacity-80 font-bold ml-1"> ${opChar} ${Frac.toHTML(valFrac)}</span>`;
+                let lhsWrap = state.lhs.length > 1 ? `(${formatSide(state.lhs)})` : formatSide(state.lhs);
+                let rhsWrap = state.rhs.length > 1 ? `(${formatSide(state.rhs)})` : formatSide(state.rhs);
+                intermediateHTML = `${lhsWrap}${opStr} <span class="mx-3 text-indigo-500">=</span> ${rhsWrap}${opStr}`;
+            }
+
+            if (op === '+' || op === '-') {
+                let coeffToApply = op === '+' ? valFrac : Frac.create(-valFrac.n, valFrac.d);
+                state.lhs.push({ id: generateId(), type: 'normal', coeff: coeffToApply, var: null });
+                state.rhs.push({ id: generateId(), type: 'normal', coeff: coeffToApply, var: null });
+                addHistoryRecord(`${op === '+' ? 'Added' : 'Subtracted'} ${Frac.toHTML(valFrac)} to both sides.`);
+            } 
+            else if (op === '*' || op === '/') {
+                let applyMath = (side) => {
+                    side.forEach(t => {
+                        if (t.type === 'normal') {
+                            t.coeff = op === '*' ? Frac.mul(t.coeff, valFrac) : Frac.div(t.coeff, valFrac);
+                        } else if (t.type === 'group') {
+                            t.factor = op === '*' ? Frac.mul(t.factor, valFrac) : Frac.div(t.factor, valFrac);
+                        }
+                    });
+                };
+                applyMath(state.lhs);
+                applyMath(state.rhs);
+                addHistoryRecord(`${op === '*' ? 'Multiplied' : 'Divided'} both sides by ${Frac.toHTML(valFrac)}.`, intermediateHTML);
+            }
+            updateUI();
+        }
+
+        function resetEquation() {
+            state.lhs = JSON.parse(JSON.stringify(state.originalLhs));
+            state.rhs = JSON.parse(JSON.stringify(state.originalRhs));
+            state.history = [];
+            state.stepCounter = 0;
+            state.selectedTermIds = [];
+            addHistoryRecord("Original Equation");
+            updateUI();
+        }
+
+        // --- History & State Tracking ---
+        function addHistoryRecord(actionDescription, intermediateHTML = null) {
+            state.history.push({
+                stepNum: state.stepCounter++,
+                action: actionDescription,
+                eqStr: formatEquation(),
+                intermediateHTML: intermediateHTML,
+                lhsSnapshot: JSON.parse(JSON.stringify(state.lhs)),
+                rhsSnapshot: JSON.parse(JSON.stringify(state.rhs))
+            });
+        }
+
+        function executeUndo() {
+            // Cannot undo if we are at the very first original equation
+            if (state.history.length <= 1) return;
+            
+            // Pop the current state out of history
+            state.history.pop();
+            state.stepCounter--;
+            
+            // Restore actual blocks from the NEW last state in history
+            let previousState = state.history[state.history.length - 1];
+            state.lhs = JSON.parse(JSON.stringify(previousState.lhsSnapshot));
+            state.rhs = JSON.parse(JSON.stringify(previousState.rhsSnapshot));
+            state.selectedTermIds = [];
+            
+            updateUI();
+        }
+
+        function checkSolved() {
+            let isSolved = false;
+            let checkSides = (s1, s2) => {
+                if (s1.length === 1 && s2.length === 1) {
+                    if (s1[0].type === 'normal' && s1[0].var && s1[0].coeff.n === 1 && s1[0].coeff.d === 1 && !s2[0].var && s2[0].type === 'normal') isSolved = true;
+                }
+            };
+            checkSides(state.lhs, state.rhs);
+            checkSides(state.rhs, state.lhs);
+
+            if (isSolved) ui.successBanner.classList.remove('hidden');
+            else ui.successBanner.classList.add('hidden');
+        }
+
+        // --- Rendering Engine ---
+        function updateUI() {
+            let renderSide = (sideArray) => {
+                return sideArray.map(t => {
+                    let isSelected = state.selectedTermIds.includes(t.id);
+                    let valHTML = "";
+                    let signStr = "";
+
+                    if (t.type === 'normal') {
+                        let isNeg = t.coeff.n < 0;
+                        signStr = isNeg ? '−' : '+';
+                        let absF = Frac.abs(t.coeff);
+                        let showCoeff = !(absF.n === 1 && absF.d === 1 && t.var);
+                        
+                        if (showCoeff) {
+                            if (absF.d === 1) valHTML += absF.n;
+                            else valHTML += `<div class="inline-flex flex-col items-center justify-center align-middle mx-1 text-[0.7em] sm:text-[0.8em] leading-none"><span class="border-b-2 border-current px-1 pb-[2px]">${absF.n}</span><span class="pt-[2px]">${absF.d}</span></div>`;
+                        }
+                        if (t.var) valHTML += t.var;
+                        if (absF.n === 0 && !t.var) { signStr = ""; valHTML = "0"; }
+                    } 
+                    else if (t.type === 'group') {
+                        let isNeg = t.factor.n < 0;
+                        signStr = isNeg ? '−' : '+';
+                        let absF = Frac.abs(t.factor);
+                        let innerFormatted = t.innerTerms.map((it, i) => formatTermPlain(it, i===0)).join('');
+                        
+                        if (absF.d === 1) {
+                            let multStr = absF.n !== 1 ? absF.n : '';
+                            valHTML = `<span class="flex items-center">${multStr}(${innerFormatted})</span>`;
+                        } else {
+                            let multStr = absF.n !== 1 ? absF.n : '';
+                            valHTML = `<div class="inline-flex flex-col items-center justify-center align-middle mx-1 text-sm sm:text-base leading-tight">
+                                            <span class="border-b-2 border-slate-300 px-2 sm:px-3 pb-1">${multStr}(${innerFormatted})</span>
+                                            <span class="pt-1 text-slate-500">${absF.d}</span>
+                                        </div>`;
+                        }
+                    }
+
+                    return `
+                        <button onclick="selectTerm('${t.id}')" 
+                                class="flex items-center bg-white border-2 border-slate-200 rounded-xl overflow-hidden transition-all duration-200 hover:border-indigo-400 hover:shadow-md shadow-sm shrink-0 ${isSelected ? 'term-selected' : ''}">
+                            ${signStr ? `<div class="px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-500 font-bold text-base sm:text-lg border-r border-slate-200">${signStr}</div>` : ''}
+                            <div class="px-2 sm:px-4 py-1.5 sm:py-2 text-slate-800 font-mono font-bold text-base sm:text-xl flex items-center">${valHTML}</div>
+                        </button>
+                    `;
+                }).join('');
+            };
+
+            ui.lhsZone.innerHTML = state.lhs.length === 0 ? `<span class="text-slate-400 font-mono text-xl">0</span>` : renderSide(state.lhs);
+            ui.rhsZone.innerHTML = state.rhs.length === 0 ? `<span class="text-slate-400 font-mono text-xl">0</span>` : renderSide(state.rhs);
+
+            ui.btnMove.disabled = state.selectedTermIds.length === 0;
+            ui.btnUndo.disabled = state.history.length <= 1;
+
+            ui.historyContainer.innerHTML = state.history.map((record, index) => {
+                let isLast = index === state.history.length - 1;
+                
+                let intermediateRender = record.intermediateHTML ? `
+                    <div class="mb-2 sm:mb-3 text-slate-500 font-mono text-sm sm:text-base opacity-80 pl-1 sm:pl-2 whitespace-nowrap overflow-x-auto no-scrollbar">
+                        ${record.intermediateHTML}
+                    </div>
+                    <div class="flex justify-start pl-6 sm:pl-8 mb-2">
+                        <svg class="h-3 w-3 sm:h-4 sm:w-4 text-slate-300 transform -rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="flex gap-3 sm:gap-4 relative">
+                        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white border-2 ${isLast ? 'border-indigo-400 text-indigo-500' : 'border-slate-300 text-slate-500'} flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 z-10 shadow-sm">
+                            ${record.stepNum}
+                        </div>
+                        <div class="pt-1 pb-4 flex-1 min-w-0">
+                            ${record.stepNum > 0 ? `<p class="text-xs sm:text-sm font-medium text-amber-600 mb-2 flex items-center gap-1 sm:gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg> <span class="truncate">${record.action}</span></p>` : ''}
+                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 inline-flex flex-col shadow-sm max-w-full overflow-hidden">
+                                ${intermediateRender}
+                                <span class="font-mono text-base sm:text-lg font-bold flex items-center whitespace-nowrap overflow-x-auto no-scrollbar ${isLast ? 'text-slate-800' : 'text-slate-600'} tracking-wide">${record.eqStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            setTimeout(() => {
+                const historyDiv = ui.historyContainer.parentElement;
+                historyDiv.scrollTop = historyDiv.scrollHeight;
+            }, 50);
+
+            checkSolved();
+        }
+
+        ui.input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') parseAndStart();
+        });
+    </script>
+</body>
+</html>
