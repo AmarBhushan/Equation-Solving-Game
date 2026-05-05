@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeniusHub Equation Solver</title>
+    <title>Equation Solver</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700&display=swap');
@@ -35,12 +35,17 @@
         /* Timeline styles */
         .timeline-line {
             position: absolute;
-            left: 1.5rem;
-            top: 2.5rem;
+            left: 1.25rem;
+            top: 0;
             bottom: 0;
             width: 2px;
             background-color: rgba(99, 102, 241, 0.2); /* indigo-500/20 */
             z-index: 0;
+        }
+        @media (min-width: 640px) {
+            .timeline-line {
+                left: 1.5rem;
+            }
         }
 
         /* Term Selection Animation */
@@ -49,6 +54,25 @@
             background-color: rgba(224, 231, 255, 0.6) !important; /* indigo-100 */
             box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
             transform: scale(1.02);
+        }
+
+        /* Custom Notebook Strikethrough */
+        .cancel-strike {
+            position: relative;
+            display: inline-block;
+        }
+        .cancel-strike::after {
+            content: '';
+            position: absolute;
+            left: -5%;
+            right: -5%;
+            top: 50%;
+            height: 2px;
+            background-color: #f43f5e; /* rose-500 */
+            transform: translateY(-50%) rotate(-8deg); /* Slanted notebook cross-out */
+            border-radius: 2px;
+            opacity: 0.8;
+            pointer-events: none;
         }
 
         /* Custom Scrollbar */
@@ -78,10 +102,29 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center p-2 sm:p-6 overflow-x-hidden selection:bg-indigo-200 selection:text-indigo-900">
+<body class="h-[100dvh] flex flex-col items-center p-2 sm:p-4 overflow-y-auto overflow-x-hidden selection:bg-indigo-200 selection:text-indigo-900">
 
-    <!-- Toast Notification Container -->
-    <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none"></div>
+    <!-- Custom Modal Overlay -->
+    <div id="custom-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-all duration-300 border border-slate-200" id="custom-modal-box">
+            <div class="bg-indigo-50/50 px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500 shrink-0 shadow-sm border border-indigo-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <h3 id="modal-title" class="text-lg font-bold text-slate-800">Notice</h3>
+            </div>
+            <div class="p-6">
+                <p id="modal-message" class="text-slate-600 text-sm md:text-base leading-relaxed"></p>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end">
+                <button onclick="closeModal()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-indigo-500/20 active:translate-y-0.5">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Decorative Background Orbs -->
     <div class="fixed inset-0 z-0 flex justify-center items-center overflow-hidden pointer-events-none">
@@ -89,40 +132,58 @@
         <div class="absolute w-[600px] h-[600px] bg-teal-200/40 rounded-full blur-[100px] bottom-10 right-0"></div>
     </div>
 
-    <main class="relative z-10 w-full max-w-5xl flex flex-col h-full gap-4">
+    <main class="relative z-10 w-full max-w-5xl flex flex-col flex-1 shrink-0 gap-3 sm:gap-4">
         
         <!-- ================= SETUP VIEW ================= -->
-        <div id="view-setup" class="glass rounded-3xl p-6 sm:p-8 text-center w-full max-w-lg mx-auto mt-4 sm:mt-10 transition-all">
-            <div class="mb-6 sm:mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-indigo-100 to-teal-100 text-indigo-500 mb-4 shadow-sm border border-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                    </svg>
-                </div>
-                <h1 class="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight mb-1 sm:mb-2">GeniusHub</h1>
-                <p class="text-slate-500 font-medium text-sm sm:text-base">Interactive Step-by-Step Solver</p>
+        <div id="view-setup" class="glass rounded-3xl p-6 sm:p-8 text-center w-full max-w-2xl mx-auto my-auto transition-all">
+            
+            <!-- GeniusHub Branding Title -->
+            <div class="mb-6 text-center">
+                <h1 class="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-teal-500 tracking-tight pb-1">GeniusHub</h1>
+                <p class="text-slate-500 font-bold uppercase tracking-widest text-xs mt-1">Equation Solver</p>
             </div>
 
-            <div class="bg-slate-50/50 p-4 sm:p-5 rounded-2xl border border-slate-200/50 relative text-left space-y-3 sm:space-y-4">
-                <label for="eq-input" class="block text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-wider mb-1 sm:mb-2">Enter your equation:</label>
-                <input type="text" id="eq-input" placeholder="e.g. (3x - 2)/4 = 5" 
-                       class="w-full bg-white border-2 border-slate-200 rounded-xl px-3 sm:px-4 py-3 text-lg sm:text-xl font-mono text-slate-800 shadow-sm focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 transition-all"
-                       value="(3x - 2)/4 = 5">
-                <p class="text-[10px] sm:text-xs text-slate-500 mt-2">Supports variables, grouped fractions like (2x-1)/3, and decimals.</p>
-                <button onclick="parseAndStart()" class="w-full mt-3 sm:mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md shadow-indigo-500/20 transition-all text-lg sm:text-xl transform hover:-translate-y-0.5 active:translate-y-0">
+            <div class="bg-slate-50/50 p-4 sm:p-6 rounded-2xl border border-slate-200/50 relative text-left">
+                <label class="block text-base sm:text-lg font-bold text-slate-700 tracking-tight mb-4 text-center">Build your equation:</label>
+                
+                <!-- Visual Equation Builder -->
+                <div class="bg-white border-2 border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-400/10 transition-all flex items-center justify-center gap-2 sm:gap-4 relative mb-6">
+                    
+                    <!-- LHS Container -->
+                    <div class="flex-1 flex flex-col items-center justify-center relative min-h-[4rem]">
+                        <input type="text" id="lhs-top" value="3x - 2" class="w-full text-center font-mono text-xl sm:text-2xl text-slate-800 bg-transparent outline-none placeholder-slate-300" placeholder="LHS (e.g. 3x)">
+                        <div id="lhs-divider" class="w-full h-[2px] sm:h-[3px] bg-slate-800 my-1 rounded-full"></div>
+                        <input type="text" id="lhs-bottom" value="x + 2" class="w-full text-center font-mono text-xl sm:text-2xl text-slate-800 bg-transparent outline-none placeholder-slate-300" placeholder="Denominator">
+                        <button id="lhs-toggle" onclick="toggleFraction('lhs')" class="absolute -bottom-8 sm:-bottom-10 text-[9px] sm:text-[10px] text-indigo-500 font-bold uppercase tracking-widest hover:text-indigo-700 transition-colors bg-slate-50 px-2 py-1 rounded border border-slate-200 shadow-sm whitespace-nowrap z-10">Remove Fraction</button>
+                    </div>
+
+                    <!-- Equals Sign -->
+                    <div class="text-3xl sm:text-4xl font-black text-slate-400 shrink-0 px-1 sm:px-2">=</div>
+
+                    <!-- RHS Container -->
+                    <div class="flex-1 flex flex-col items-center justify-center relative min-h-[4rem]">
+                        <input type="text" id="rhs-top" value="5" class="w-full text-center font-mono text-xl sm:text-2xl text-slate-800 bg-transparent outline-none placeholder-slate-300" placeholder="RHS (e.g. 5)">
+                        <div id="rhs-divider" class="w-full h-[2px] sm:h-[3px] bg-slate-800 my-1 rounded-full hidden"></div>
+                        <input type="text" id="rhs-bottom" value="" class="w-full text-center font-mono text-xl sm:text-2xl text-slate-800 bg-transparent outline-none placeholder-slate-300 hidden" placeholder="Denominator">
+                        <button id="rhs-toggle" onclick="toggleFraction('rhs')" class="absolute -bottom-8 sm:-bottom-10 text-[9px] sm:text-[10px] text-indigo-500 font-bold uppercase tracking-widest hover:text-indigo-700 transition-colors bg-slate-50 px-2 py-1 rounded border border-slate-200 shadow-sm whitespace-nowrap z-10">Add Fraction</button>
+                    </div>
+
+                </div>
+
+                <p class="text-[10px] sm:text-xs text-slate-500 mt-8 text-center">Use the "Add Fraction" buttons to stack terms visually instead of using slashes.</p>
+                
+                <button onclick="parseAndStart()" class="w-full mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md shadow-indigo-500/20 transition-all text-lg sm:text-xl transform hover:-translate-y-0.5 active:translate-y-0">
                     Start Solving
                 </button>
-                <p id="setup-error" class="text-rose-500 text-sm font-bold hidden mt-4"></p>
+                <p id="setup-error" class="text-rose-500 text-sm font-bold hidden mt-4 text-center"></p>
             </div>
         </div>
 
         <!-- ================= WORKSPACE VIEW ================= -->
-        <div id="view-workspace" class="hidden flex-col w-full h-full gap-3 sm:gap-4 pb-10">
+        <div id="view-workspace" class="hidden flex-col w-full h-full gap-2 sm:gap-3 shrink-0">
             
             <!-- Header -->
-            <div class="glass rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center shrink-0 gap-3 sm:gap-0">
+            <div class="glass rounded-2xl p-2 sm:p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center shrink-0 gap-2 sm:gap-0">
                 <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-hidden">
                     <button onclick="showSetup()" class="shrink-0 bg-white hover:bg-slate-50 text-slate-600 p-2 rounded-lg transition-colors border border-slate-200 shadow-sm" title="Back to Setup">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +193,7 @@
                     <div class="flex items-center gap-2 overflow-hidden flex-1">
                         <span class="hidden sm:inline text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">Original:</span>
                         <div class="overflow-x-auto no-scrollbar w-full">
-                            <h2 id="workspace-title" class="text-xs sm:text-sm md:text-lg font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 sm:px-3 rounded-md border border-slate-200 shadow-inner whitespace-nowrap inline-block"></h2>
+                            <h2 id="workspace-title" class="text-xs sm:text-sm md:text-lg font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 sm:px-3 rounded-md border border-slate-200 shadow-inner whitespace-nowrap inline-block align-middle"></h2>
                         </div>
                     </div>
                 </div>
@@ -150,10 +211,10 @@
             </div>
 
             <!-- Current Equation Board (Balance Machine) -->
-            <div class="glass rounded-3xl p-3 sm:p-8 flex flex-col items-center justify-center relative shrink-0 border-t-4 border-t-indigo-400 shadow-sm overflow-visible z-10">
-                <p class="text-slate-500 font-bold text-[10px] sm:text-xs uppercase tracking-widest mb-2 bg-slate-100/50 px-3 py-1 rounded-full border border-slate-200/50 backdrop-blur-sm z-20">Equation Balance</p>
+            <div class="glass rounded-3xl p-2 sm:p-4 flex flex-col items-center justify-center relative shrink-0 border-t-4 border-t-indigo-400 shadow-sm overflow-visible z-10">
+                <p class="text-slate-500 font-bold text-[10px] sm:text-xs uppercase tracking-widest mb-1 sm:mb-2 bg-slate-100/50 px-3 py-1 rounded-full border border-slate-200/50 backdrop-blur-sm z-20">Equation Balance</p>
                 
-                <div class="relative w-full max-w-4xl pt-4 sm:pt-8 pb-2 sm:pb-4">
+                <div class="relative w-full max-w-4xl pt-2 sm:pt-4 pb-1 sm:pb-2">
                     
                     <!-- Physical Balance Scale Graphic (Desktop) -->
                     <div class="absolute inset-0 pointer-events-none hidden md:block z-0">
@@ -171,25 +232,25 @@
                     </div>
 
                     <!-- Content Area (The Pans) -->
-                    <div class="flex flex-col md:flex-row items-stretch justify-center gap-6 md:gap-8 lg:gap-16 w-full relative z-10 mt-2 md:mt-12">
+                    <div class="flex flex-col md:flex-row items-stretch justify-center gap-4 md:gap-6 lg:gap-12 w-full relative z-10 mt-2 md:mt-8">
                         
                         <!-- LHS Pan -->
                         <div class="flex-1 flex flex-col items-center w-full group min-w-0">
                             <!-- Strings connecting to beam -->
-                            <svg class="hidden md:block w-40 h-16 text-slate-400 -mt-8 opacity-70" viewBox="0 0 100 50" preserveAspectRatio="none">
+                            <svg class="hidden md:block w-40 h-12 sm:h-16 text-slate-400 -mt-6 sm:-mt-8 opacity-70" viewBox="0 0 100 50" preserveAspectRatio="none">
                                 <line x1="50" y1="0" x2="5" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 <line x1="50" y1="0" x2="95" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                             
-                            <div class="w-full bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl border-x border-t border-slate-200 border-b-8 sm:border-b-[14px] border-b-slate-300 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col items-center relative md:-mt-1 transition-transform duration-300 group-hover:translate-y-0 md:group-hover:-translate-y-1">
-                                <div class="absolute -top-3 sm:-top-5 bg-indigo-50 text-indigo-700 font-black text-[10px] sm:text-sm uppercase tracking-widest px-4 sm:px-6 py-1 sm:py-2 rounded-full shadow-sm border border-indigo-200 z-10">LHS</div>
-                                <div id="lhs-zone" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 min-h-[80px] sm:min-h-[140px] p-3 sm:p-6 w-full pt-6 sm:pt-10 overflow-x-auto no-scrollbar"></div>
+                            <div class="w-full bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl border-x border-t border-slate-200 border-b-8 sm:border-b-[10px] border-b-slate-300 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col items-center relative md:-mt-1 transition-transform duration-300 group-hover:translate-y-0 md:group-hover:-translate-y-1">
+                                <div class="absolute -top-3 sm:-top-4 bg-indigo-50 text-indigo-700 font-black text-[10px] sm:text-xs uppercase tracking-widest px-4 sm:px-5 py-1 rounded-full shadow-sm border border-indigo-200 z-10">LHS</div>
+                                <div id="lhs-zone" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 min-h-[60px] sm:min-h-[100px] p-2 sm:p-4 w-full pt-5 sm:pt-8 overflow-x-auto no-scrollbar"></div>
                             </div>
                         </div>
                         
                         <!-- Equals Sign Pivot -->
                         <div class="flex flex-col items-center justify-center self-center my-1 md:my-0 z-20 md:translate-y-4 shrink-0">
-                            <div class="w-10 h-10 sm:w-14 sm:h-14 bg-white rounded-full shadow-lg border-2 sm:border-4 border-slate-100 flex items-center justify-center relative text-slate-400 font-black text-2xl sm:text-3xl">
+                            <div class="w-8 h-8 sm:w-12 sm:h-12 bg-white rounded-full shadow-lg border-2 sm:border-4 border-slate-100 flex items-center justify-center relative text-slate-400 font-black text-xl sm:text-2xl">
                                 =
                             </div>
                         </div>
@@ -197,14 +258,14 @@
                         <!-- RHS Pan -->
                         <div class="flex-1 flex flex-col items-center w-full group min-w-0">
                             <!-- Strings connecting to beam -->
-                            <svg class="hidden md:block w-40 h-16 text-slate-400 -mt-8 opacity-70" viewBox="0 0 100 50" preserveAspectRatio="none">
+                            <svg class="hidden md:block w-40 h-12 sm:h-16 text-slate-400 -mt-6 sm:-mt-8 opacity-70" viewBox="0 0 100 50" preserveAspectRatio="none">
                                 <line x1="50" y1="0" x2="5" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 <line x1="50" y1="0" x2="95" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                             
-                            <div class="w-full bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl border-x border-t border-slate-200 border-b-8 sm:border-b-[14px] border-b-slate-300 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col items-center relative md:-mt-1 transition-transform duration-300 group-hover:translate-y-0 md:group-hover:-translate-y-1">
-                                <div class="absolute -top-3 sm:-top-5 bg-teal-50 text-teal-700 font-black text-[10px] sm:text-sm uppercase tracking-widest px-4 sm:px-6 py-1 sm:py-2 rounded-full shadow-sm border border-teal-200 z-10">RHS</div>
-                                <div id="rhs-zone" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 min-h-[80px] sm:min-h-[140px] p-3 sm:p-6 w-full pt-6 sm:pt-10 overflow-x-auto no-scrollbar"></div>
+                            <div class="w-full bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl border-x border-t border-slate-200 border-b-8 sm:border-b-[10px] border-b-slate-300 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col items-center relative md:-mt-1 transition-transform duration-300 group-hover:translate-y-0 md:group-hover:-translate-y-1">
+                                <div class="absolute -top-3 sm:-top-4 bg-teal-50 text-teal-700 font-black text-[10px] sm:text-xs uppercase tracking-widest px-4 sm:px-5 py-1 rounded-full shadow-sm border border-teal-200 z-10">RHS</div>
+                                <div id="rhs-zone" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 min-h-[60px] sm:min-h-[100px] p-2 sm:p-4 w-full pt-5 sm:pt-8 overflow-x-auto no-scrollbar"></div>
                             </div>
                         </div>
 
@@ -213,8 +274,8 @@
             </div>
 
             <!-- Action Toolbar -->
-            <div class="glass rounded-2xl p-3 sm:p-6 flex flex-col gap-3 sm:gap-4 shrink-0 bg-white/80 shadow-sm">
-                <p class="text-slate-500 font-bold text-xs sm:text-sm uppercase tracking-wider border-b border-slate-100 pb-1 sm:pb-2">Choose an Action</p>
+            <div class="glass rounded-2xl p-3 sm:p-4 flex flex-col gap-2 sm:gap-3 shrink-0 bg-white/80 shadow-sm">
+                <p class="text-slate-500 font-bold text-xs sm:text-sm uppercase tracking-wider border-b border-slate-100 pb-1">Choose an Action</p>
                 
                 <div class="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch lg:items-center justify-between">
                     
@@ -239,16 +300,16 @@
                     <!-- Whole Equation Operations -->
                     <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-slate-50 p-2 rounded-xl border border-slate-200 justify-center">
                         <div class="flex gap-2">
-                            <select id="op-select" class="flex-1 sm:flex-none bg-white border border-slate-300 text-slate-700 font-bold rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 shadow-sm">
+                            <select id="op-select" class="flex-1 sm:flex-none bg-white border border-slate-300 text-slate-700 font-bold rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 shadow-sm">
                                 <option value="+">Add (+)</option>
                                 <option value="-">Subtract (-)</option>
                                 <option value="*">Multiply (×)</option>
                                 <option value="/">Divide (÷)</option>
                             </select>
-                            <input type="text" id="op-val" placeholder="Num or a/b" class="w-20 sm:w-28 bg-white border border-slate-300 text-slate-800 font-mono font-bold rounded-lg px-2 sm:px-3 py-2 text-sm sm:text-base focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 text-center shadow-sm" value="4">
+                            <input type="text" id="op-val" placeholder="Num or expr" class="w-24 sm:w-32 bg-white border border-slate-300 text-slate-800 font-mono font-bold rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-base focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 text-center shadow-sm" value="x + 2">
                         </div>
-                        <button onclick="executeOperation()" class="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-sm text-sm sm:text-base">
-                            Apply to Both Sides
+                        <button onclick="executeOperation()" class="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 sm:py-2 px-4 rounded-lg transition-colors shadow-sm text-sm sm:text-base">
+                            Apply
                         </button>
                     </div>
 
@@ -256,17 +317,19 @@
             </div>
 
             <!-- Success Banner -->
-            <div id="success-banner" class="hidden glass bg-emerald-50/80 border-2 border-emerald-400 p-6 rounded-2xl text-center shadow-[0_4px_20px_rgba(52,211,153,0.3)] animate-pulse">
-                <h3 class="text-2xl font-black text-emerald-600 mb-1">Equation Solved!</h3>
-                <p class="text-emerald-700">Great job applying the correct operations.</p>
+            <div id="success-banner" class="hidden glass bg-emerald-50/80 border-2 border-emerald-400 p-4 sm:p-6 rounded-2xl text-center shadow-[0_4px_20px_rgba(52,211,153,0.3)] animate-pulse shrink-0">
+                <h3 class="text-xl sm:text-2xl font-black text-emerald-600 mb-1">Equation Solved!</h3>
+                <p class="text-emerald-700 text-sm sm:text-base">Great job applying the correct operations.</p>
             </div>
 
             <!-- Step-by-Step History Timeline -->
-            <div class="glass rounded-3xl p-6 shadow-sm flex-1 relative min-h-[300px]">
-                <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-200 pb-3">Step-by-Step Working</h3>
-                <div class="timeline-line"></div>
-                <div id="history-container" class="space-y-6 relative z-10 pl-2">
-                    <!-- History injected here -->
+            <div class="glass rounded-3xl p-4 sm:p-5 shadow-sm relative flex flex-col min-h-[300px] shrink-0 mt-2 mb-4">
+                <h3 class="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 border-b border-slate-200 pb-2 shrink-0">Step-by-Step Working</h3>
+                <div id="history-scroll-container" class="relative flex-1 overflow-y-auto no-scrollbar pl-2 pr-2">
+                    <div class="timeline-line"></div>
+                    <div id="history-container" class="space-y-4 sm:space-y-6 relative z-10 pb-4">
+                        <!-- History injected here -->
+                    </div>
                 </div>
             </div>
 
@@ -290,7 +353,7 @@
             mul: (a, b) => Frac.create(a.n * b.n, a.d * b.d),
             div: (a, b) => Frac.create(a.n * b.d, a.d * b.n),
             parse: (str) => {
-                str = str.replace(/[\s$₹£€,]/g, ''); // Strip spaces, commas, and currency symbols
+                str = str.replace(/[\s$₹£€,]/g, ''); 
                 if (!str || str === '+' || str === '-') return Frac.create(str === '-' ? -1 : 1, 1);
                 if (str.includes('/')) {
                     let parts = str.split('/');
@@ -313,10 +376,10 @@
                 let absF = Frac.abs(f);
                 let sign = f.n < 0 ? "−" : "";
                 if (absF.d === 1) return sign + absF.n;
-                return `${sign}<span class="inline-flex flex-col items-center justify-center align-middle mx-1 text-[0.8em] leading-none font-bold">
-                            <span class="border-b-2 border-current px-1 pb-[2px]">${absF.n}</span>
+                return `${sign}<div class="inline-flex flex-col items-center justify-center align-middle mx-[2px] text-[0.75em] leading-none font-bold">
+                            <span class="border-b-[1.5px] border-current px-1 pb-[2px]">${absF.n}</span>
                             <span class="pt-[2px]">${absF.d}</span>
-                        </span>`;
+                        </div>`;
             }
         };
 
@@ -332,13 +395,16 @@
             stepCounter: 0
         };
 
+        // Fraction Builder State
+        let isLhsFraction = true;
+        let isRhsFraction = false;
+
         // --- DOM Elements ---
         const views = {
             setup: document.getElementById('view-setup'),
             workspace: document.getElementById('view-workspace')
         };
         const ui = {
-            input: document.getElementById('eq-input'),
             error: document.getElementById('setup-error'),
             lhsZone: document.getElementById('lhs-zone'),
             rhsZone: document.getElementById('rhs-zone'),
@@ -368,25 +434,53 @@
             switchView('setup'); 
         }
 
-        // --- Custom Toast Notification ---
-        function showToast(msg) {
-            let container = document.getElementById('toast-container');
-            let toast = document.createElement('div');
-            toast.className = 'bg-rose-500/95 backdrop-blur-md text-white px-6 py-3 rounded-xl shadow-2xl font-bold transition-all duration-300 transform -translate-y-4 opacity-0 border border-rose-400 text-center text-sm';
-            toast.textContent = msg;
-            container.appendChild(toast);
+        // --- Visual Equation Builder Logic ---
+        function toggleFraction(side) {
+            if (side === 'lhs') {
+                isLhsFraction = !isLhsFraction;
+                document.getElementById('lhs-divider').classList.toggle('hidden', !isLhsFraction);
+                document.getElementById('lhs-bottom').classList.toggle('hidden', !isLhsFraction);
+                document.getElementById('lhs-toggle').innerText = isLhsFraction ? "Remove Fraction" : "Add Fraction";
+                if (!isLhsFraction) document.getElementById('lhs-bottom').value = ""; 
+            } else {
+                isRhsFraction = !isRhsFraction;
+                document.getElementById('rhs-divider').classList.toggle('hidden', !isRhsFraction);
+                document.getElementById('rhs-bottom').classList.toggle('hidden', !isRhsFraction);
+                document.getElementById('rhs-toggle').innerText = isRhsFraction ? "Remove Fraction" : "Add Fraction";
+                if (!isRhsFraction) document.getElementById('rhs-bottom').value = "";
+            }
+        }
+
+        // --- Custom Modal Logic ---
+        function showModal(title, msg) {
+            const modal = document.getElementById('custom-modal');
+            const box = document.getElementById('custom-modal-box');
+            document.getElementById('modal-title').textContent = title || "Notice";
+            document.getElementById('modal-message').textContent = msg;
+            
+            modal.classList.remove('hidden');
             
             // Trigger animation
             requestAnimationFrame(() => {
-                toast.classList.remove('-translate-y-4', 'opacity-0');
-                toast.classList.add('translate-y-0', 'opacity-100');
+                modal.classList.remove('opacity-0');
+                modal.classList.add('opacity-100');
+                box.classList.remove('scale-95');
+                box.classList.add('scale-100');
             });
+        }
 
+        function closeModal() {
+            const modal = document.getElementById('custom-modal');
+            const box = document.getElementById('custom-modal-box');
+            
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+            
             setTimeout(() => {
-                toast.classList.remove('translate-y-0', 'opacity-100');
-                toast.classList.add('-translate-y-4', 'opacity-0');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
+                modal.classList.add('hidden');
+            }, 300);
         }
 
         // --- Core Parsing Logic ---
@@ -427,23 +521,34 @@
 
         function parseTerm(str) {
             str = str.trim();
-            // Match grouped logic: e.g. +(3x-2)/4
-            let groupMatch = str.match(/^([+-]?)([\d./]*)\((.*)\)(?:\/([\d.]+))?$/);
+            // Allows parsing e.g., (3x-2)/(x+2)
+            let groupMatch = str.match(/^([+-]?)([\d./]*)\((.*?)\)(?:\/([\d.]+))?(?:\/\((.*?)\))?$/);
             if (groupMatch) {
                 let signStr = groupMatch[1];
                 let multStr = groupMatch[2];
                 let innerStr = groupMatch[3];
                 let divStr = groupMatch[4];
+                let divExprStr = groupMatch[5];
 
                 let mult = Frac.parse(multStr || '1');
                 if (signStr === '-') mult = Frac.mul(mult, Frac.create(-1));
-                let div = Frac.parse(divStr || '1');
-                let factor = Frac.div(mult, div);
+                
+                let factor = mult;
+                if (divStr) {
+                    let div = Frac.parse(divStr || '1');
+                    factor = Frac.div(mult, div);
+                }
 
                 let innerTermStrs = splitTerms(innerStr);
                 let innerTerms = innerTermStrs.map(t => parseNormalTerm(t)).filter(t => t !== null);
+                
+                let bottomTerms = null;
+                if (divExprStr) {
+                    let bottomTermStrs = splitTerms(divExprStr);
+                    bottomTerms = bottomTermStrs.map(t => parseNormalTerm(t)).filter(t => t !== null);
+                }
 
-                return { id: generateId(), type: 'group', factor: factor, innerTerms: innerTerms };
+                return { id: generateId(), type: 'group', factor: factor, innerTerms: innerTerms, bottomTerms: bottomTerms };
             }
             return parseNormalTerm(str);
         }
@@ -461,11 +566,38 @@
 
         function parseAndStart() {
             ui.error.classList.add('hidden');
-            let rawEq = ui.input.value.replace(/--/g, '+').replace(/\+-/g, '-');
+            
+            let lTop = document.getElementById('lhs-top').value.trim();
+            let lBot = document.getElementById('lhs-bottom').value.trim();
+            let rTop = document.getElementById('rhs-top').value.trim();
+            let rBot = document.getElementById('rhs-bottom').value.trim();
+
+            if (!lTop || !rTop) {
+                ui.error.textContent = "Please fill in both the Left and Right sides of the equation.";
+                ui.error.classList.remove('hidden');
+                return;
+            }
+
+            if (isLhsFraction && !lBot) {
+                ui.error.textContent = "Please fill in the LHS denominator, or remove the fraction.";
+                ui.error.classList.remove('hidden');
+                return;
+            }
+
+            if (isRhsFraction && !rBot) {
+                ui.error.textContent = "Please fill in the RHS denominator, or remove the fraction.";
+                ui.error.classList.remove('hidden');
+                return;
+            }
+
+            let rawLhs = isLhsFraction ? `(${lTop})/(${lBot})` : lTop;
+            let rawRhs = isRhsFraction ? `(${rTop})/(${rBot})` : rTop;
+
+            let rawEq = `${rawLhs}=${rawRhs}`.replace(/--/g, '+').replace(/\+-/g, '-');
             const parts = rawEq.split('=');
             
             if (parts.length !== 2 || parts[0] === "" || parts[1] === "") {
-                ui.error.textContent = "Please enter a valid equation with one '=' sign.";
+                ui.error.textContent = "Invalid equation structure.";
                 ui.error.classList.remove('hidden');
                 return;
             }
@@ -486,6 +618,17 @@
             updateUI();
         }
 
+        // --- Helper for Expression Comparison ---
+        function compareTerms(arr1, arr2) {
+            if (!arr1 || !arr2 || arr1.length !== arr2.length) return false;
+            let a1 = arr1.map(t => `${t.coeff.n}/${t.coeff.d}${t.var||''}`).sort();
+            let a2 = arr2.map(t => `${t.coeff.n}/${t.coeff.d}${t.var||''}`).sort();
+            for(let i=0; i<a1.length; i++) {
+                if(a1[i] !== a2[i]) return false;
+            }
+            return true;
+        }
+
         // --- Formatting & Text Generation ---
         function formatTermPlain(term, isFirst) {
             if (term.type === 'normal') {
@@ -497,7 +640,7 @@
                 
                 if (showCoeff) {
                     if (absF.d === 1) valHTML += absF.n;
-                    else valHTML += `<div class="inline-flex flex-col items-center justify-center align-middle mx-[2px] text-[0.7em] leading-none"><span class="border-b-[1.5px] border-current px-1 pb-px">${absF.n}</span><span class="pt-px">${absF.d}</span></div>`;
+                    else valHTML += `<div class="inline-flex flex-col items-center justify-center align-middle mx-[2px] text-[0.75em] leading-none"><span class="border-b-[1.5px] border-current px-1 pb-[2px]">${absF.n}</span><span class="pt-[2px]">${absF.d}</span></div>`;
                 }
                 if (term.var) valHTML += `<span class="ml-px">${term.var}</span>`;
                 if (absF.n === 0 && !term.var) { signStr = ""; valHTML = "0"; }
@@ -510,14 +653,21 @@
                 let innerHTML = term.innerTerms.map((t, i) => formatTermPlain(t, i === 0)).join('');
                 
                 let valHTML = "";
-                if (absF.d === 1) {
+                if (term.bottomTerms) {
+                    let bottomHTML = term.bottomTerms.map((t, i) => formatTermPlain(t, i === 0)).join('');
+                    let multStr = absF.n !== 1 ? absF.n : '';
+                    valHTML = `<div class="inline-flex flex-col items-center justify-center align-middle mx-1">
+                                    <span class="border-b-[1.5px] border-current px-2 pb-[2px]">${multStr}(${innerHTML})</span>
+                                    <span class="pt-[2px]">(${bottomHTML})</span>
+                               </div>`;
+                } else if (absF.d === 1) {
                     let multStr = absF.n !== 1 ? absF.n : '';
                     valHTML = `${multStr}(${innerHTML})`;
                 } else {
                     let multStr = absF.n !== 1 ? absF.n : '';
                     valHTML = `<div class="inline-flex flex-col items-center justify-center align-middle mx-1">
-                                    <span class="border-b-[1.5px] border-current px-2 pb-1">${multStr}(${innerHTML})</span>
-                                    <span class="pt-1">${absF.d}</span>
+                                    <span class="border-b-[1.5px] border-current px-2 pb-[2px]">${multStr}(${innerHTML})</span>
+                                    <span class="pt-[2px]">${absF.d}</span>
                                </div>`;
                 }
                 return signStr + valHTML;
@@ -538,7 +688,7 @@
             return sideArray.map((t, i) => {
                 let termHTML = formatTermPlain(t, i === 0);
                 if (idsToStrike.includes(t.id)) {
-                    return `<span class="line-through decoration-rose-500 decoration-2 text-slate-400 opacity-80">${termHTML}</span>`;
+                    return `<span class="cancel-strike text-slate-400 opacity-60">${termHTML}</span>`;
                 }
                 return termHTML;
             }).join("");
@@ -587,49 +737,67 @@
         }
 
         function executeExpand() {
+            if (state.selectedTermIds.length === 0) {
+                return showModal("Action Required", "Please select a bracketed term to expand by tapping it first.");
+            }
+
+            let hasUnexpandable = false;
+            let expandedCount = 0;
+
             let expandSide = (side) => {
                 let newSide = [];
-                let expandedCount = 0;
                 side.forEach(t => {
-                    if (t.type === 'group') {
-                        expandedCount++;
-                        t.innerTerms.forEach(it => {
-                            let newCoeff = Frac.mul(it.coeff, t.factor);
-                            newSide.push({ id: generateId(), type: 'normal', coeff: newCoeff, var: it.var });
-                        });
+                    if (state.selectedTermIds.includes(t.id)) {
+                        if (t.type === 'group') {
+                            if (t.bottomTerms) {
+                                hasUnexpandable = true;
+                                newSide.push(t); // Do not expand if variable denominator
+                            } else {
+                                expandedCount++;
+                                t.innerTerms.forEach(it => {
+                                    let newCoeff = Frac.mul(it.coeff, t.factor);
+                                    newSide.push({ id: generateId(), type: 'normal', coeff: newCoeff, var: it.var });
+                                });
+                            }
+                        } else {
+                            newSide.push(t); // Selected but not a group, keep as is
+                        }
                     } else {
-                        newSide.push(t);
+                        newSide.push(t); // Not selected, keep as is
                     }
                 });
-                return { newSide, expandedCount };
+                return newSide;
             };
             
             let lhsRes = expandSide(state.lhs);
             let rhsRes = expandSide(state.rhs);
             
-            if (lhsRes.expandedCount > 0 || rhsRes.expandedCount > 0) {
-                // Strike through the expanded groups for history display
-                let idsToStrike = state.lhs.filter(t => t.type === 'group').map(t => t.id)
-                    .concat(state.rhs.filter(t => t.type === 'group').map(t => t.id));
-                let intermediateHTML = formatEquationWithStrikethrough(idsToStrike);
+            if (hasUnexpandable) {
+                return showModal("Action Required", "You cannot expand a fraction with a variable denominator directly. Multiply both sides by the denominator first.");
+            }
 
-                state.lhs = lhsRes.newSide;
-                state.rhs = rhsRes.newSide;
-                addHistoryRecord("Expanded brackets using distributive property.", intermediateHTML);
+            if (expandedCount > 0) {
+                let intermediateHTML = formatEquationWithStrikethrough(state.selectedTermIds);
+                state.lhs = lhsRes;
+                state.rhs = rhsRes;
+                addHistoryRecord("Expanded selected bracket(s).", intermediateHTML);
+                state.selectedTermIds = [];
                 updateUI();
+            } else {
+                showModal("Invalid Selection", "None of the selected terms are brackets that can be expanded.");
             }
         }
 
         function executeCombine() {
             if (state.selectedTermIds.length < 2) {
-                return showToast("Please select at least two terms to combine by tapping them.");
+                return showModal("Action Required", "Please select at least two terms to combine by tapping them.");
             }
 
             let selectedLHS = state.lhs.filter(t => state.selectedTermIds.includes(t.id));
             let selectedRHS = state.rhs.filter(t => state.selectedTermIds.includes(t.id));
 
             if (selectedLHS.length > 0 && selectedRHS.length > 0) {
-                return showToast("Cannot combine terms across the '=' sign. Move them to the same side first.");
+                return showModal("Different Sides", "Cannot combine terms across the '=' sign. Move them to the same side first.");
             }
 
             let activeSide = selectedLHS.length > 0 ? 'lhs' : 'rhs';
@@ -637,23 +805,20 @@
 
             let firstTerm = selectedTerms[0];
             if (firstTerm.type === 'group' || selectedTerms.some(t => t.type === 'group')) {
-                return showToast("Please expand grouped brackets before combining.");
+                return showModal("Expand First", "Please expand grouped brackets before combining.");
             }
 
             let targetVar = firstTerm.var;
             let allLike = selectedTerms.every(t => t.type === 'normal' && t.var === targetVar);
             if (!allLike) {
-                return showToast("Please select like terms (they must have the exact same variable).");
+                return showModal("Unlike Terms", "Please select like terms (they must have the exact same variable).");
             }
 
-            // Create intermediate strike-through HTML for notebook effect
             let intermediateHTML = formatEquationWithStrikethrough(state.selectedTermIds);
 
-            // Calculate the sum
             let sumCoeff = Frac.create(0);
             selectedTerms.forEach(t => sumCoeff = Frac.add(sumCoeff, t.coeff));
 
-            // Remove selected terms and add combined term
             state[activeSide] = state[activeSide].filter(t => !state.selectedTermIds.includes(t.id));
 
             if (sumCoeff.n !== 0) {
@@ -669,27 +834,77 @@
 
         function executeOperation() {
             let op = ui.opSelect.value;
-            let valStr = ui.opVal.value;
+            let valStr = ui.opVal.value.trim();
             let valFrac = Frac.parse(valStr);
             
-            if (!valFrac) return showToast("Please enter a valid number or fraction (e.g. 4, 1.5, or 3/4).");
-            if (valFrac.n === 0 && (op === '*' || op === '/')) return showToast("Cannot multiply/divide by zero.");
-
-            let intermediateHTML = null;
-            if (op === '*' || op === '/') {
-                // Show notebook style cancellation for multiplication/division
-                let opChar = op === '*' ? '×' : '÷';
-                let opStr = `<span class="line-through decoration-rose-500 decoration-2 text-rose-500 opacity-80 font-bold ml-1"> ${opChar} ${Frac.toHTML(valFrac)}</span>`;
-                let lhsWrap = state.lhs.length > 1 ? `(${formatSide(state.lhs)})` : formatSide(state.lhs);
-                let rhsWrap = state.rhs.length > 1 ? `(${formatSide(state.rhs)})` : formatSide(state.rhs);
-                intermediateHTML = `${lhsWrap}${opStr} <span class="mx-3 text-indigo-500">=</span> ${rhsWrap}${opStr}`;
+            // Handle multiplying by variable expressions (e.g. x+2) to cancel denominators
+            if (!valFrac && op === '*') {
+                let exprStr = valStr.replace(/\s+/g, '').replace(/^\(|\)$/g, '');
+                let exprTerms = splitTerms(exprStr).map(t => parseNormalTerm(t)).filter(t => t !== null);
+                
+                if (exprTerms.length > 0) {
+                    let canApply = true;
+                    
+                    let applyExpr = (side) => {
+                        for (let i = 0; i < side.length; i++) {
+                            let t = side[i];
+                            if (t.type === 'group' && t.bottomTerms) {
+                                if (compareTerms(t.bottomTerms, exprTerms)) {
+                                    t.bottomTerms = null; // Denominator canceled!
+                                } else {
+                                    canApply = false;
+                                }
+                            } else if (t.type === 'normal') {
+                                let newInner = exprTerms.map(et => ({ id: generateId(), type: 'normal', coeff: et.coeff, var: et.var }));
+                                side[i] = { id: t.id, type: 'group', factor: t.coeff, innerTerms: newInner, bottomTerms: null };
+                            } else if (t.type === 'group' && !t.bottomTerms) {
+                                canApply = false; // Expanding nested groups is too complex for this basic step
+                            }
+                        }
+                    };
+                    
+                    let lhsCopy = JSON.parse(JSON.stringify(state.lhs));
+                    let rhsCopy = JSON.parse(JSON.stringify(state.rhs));
+                    
+                    applyExpr(lhsCopy);
+                    applyExpr(rhsCopy);
+                    
+                    if (!canApply) {
+                        return showModal("Invalid Operation", "Can only multiply by an expression if it cancels a denominator or multiplies a normal term. Expand all groups first.");
+                    }
+                    
+                    let opStr = `<span class="text-emerald-600 font-bold ml-2"> × (${exprStr})</span>`;
+                    let lhsWrap = (lhsCopy.length > 1) ? `(${formatSide(state.lhs)})` : formatSide(state.lhs);
+                    let rhsWrap = (rhsCopy.length > 1) ? `(${formatSide(state.rhs)})` : formatSide(state.rhs);
+                    
+                    let intermediateHTML = `${lhsWrap}${opStr} <span class="mx-3 text-indigo-500">=</span> ${rhsWrap}${opStr}`;
+                    
+                    state.lhs = lhsCopy;
+                    state.rhs = rhsCopy;
+                    
+                    addHistoryRecord(`Multiplied both sides by (${exprStr}).`, intermediateHTML);
+                    updateUI();
+                    return;
+                }
             }
+
+            if (!valFrac) return showModal("Action Required", "Please enter a valid number, fraction, or expression (e.g. x+2).");
+            if (valFrac.n === 0 && (op === '*' || op === '/')) return showModal("Math Error", "Cannot multiply or divide by zero.");
+
+            let opChar = op === '*' ? '×' : (op === '/' ? '÷' : (op === '+' ? '+' : '−'));
+            let opColor = 'text-emerald-600'; 
+            let opStr = `<span class="${opColor} font-bold ml-2"> ${opChar} ${Frac.toHTML(valFrac)}</span>`;
+            
+            let lhsWrap = (op === '*' || op === '/') && state.lhs.length > 1 ? `(${formatSide(state.lhs)})` : formatSide(state.lhs);
+            let rhsWrap = (op === '*' || op === '/') && state.rhs.length > 1 ? `(${formatSide(state.rhs)})` : formatSide(state.rhs);
+            
+            let intermediateHTML = `${lhsWrap}${opStr} <span class="mx-3 text-indigo-500">=</span> ${rhsWrap}${opStr}`;
 
             if (op === '+' || op === '-') {
                 let coeffToApply = op === '+' ? valFrac : Frac.create(-valFrac.n, valFrac.d);
                 state.lhs.push({ id: generateId(), type: 'normal', coeff: coeffToApply, var: null });
                 state.rhs.push({ id: generateId(), type: 'normal', coeff: coeffToApply, var: null });
-                addHistoryRecord(`${op === '+' ? 'Added' : 'Subtracted'} ${Frac.toHTML(valFrac)} to both sides.`);
+                addHistoryRecord(`${op === '+' ? 'Added' : 'Subtracted'} ${Frac.toHTML(valFrac)} to both sides.`, intermediateHTML);
             } 
             else if (op === '*' || op === '/') {
                 let applyMath = (side) => {
@@ -731,14 +946,11 @@
         }
 
         function executeUndo() {
-            // Cannot undo if we are at the very first original equation
             if (state.history.length <= 1) return;
             
-            // Pop the current state out of history
             state.history.pop();
             state.stepCounter--;
             
-            // Restore actual blocks from the NEW last state in history
             let previousState = state.history[state.history.length - 1];
             state.lhs = JSON.parse(JSON.stringify(previousState.lhsSnapshot));
             state.rhs = JSON.parse(JSON.stringify(previousState.rhsSnapshot));
@@ -777,7 +989,7 @@
                         
                         if (showCoeff) {
                             if (absF.d === 1) valHTML += absF.n;
-                            else valHTML += `<div class="inline-flex flex-col items-center justify-center align-middle mx-1 text-[0.7em] sm:text-[0.8em] leading-none"><span class="border-b-2 border-current px-1 pb-[2px]">${absF.n}</span><span class="pt-[2px]">${absF.d}</span></div>`;
+                            else valHTML += `<div class="inline-flex flex-col items-center justify-center align-middle mx-1 text-[0.7em] sm:text-[0.8em] leading-none"><span class="border-b-[1.5px] border-current px-1 pb-[2px]">${absF.n}</span><span class="pt-[2px]">${absF.d}</span></div>`;
                         }
                         if (t.var) valHTML += t.var;
                         if (absF.n === 0 && !t.var) { signStr = ""; valHTML = "0"; }
@@ -788,13 +1000,20 @@
                         let absF = Frac.abs(t.factor);
                         let innerFormatted = t.innerTerms.map((it, i) => formatTermPlain(it, i===0)).join('');
                         
-                        if (absF.d === 1) {
+                        if (t.bottomTerms) {
+                            let bottomFormatted = t.bottomTerms.map((it, i) => formatTermPlain(it, i===0)).join('');
+                            let multStr = absF.n !== 1 ? absF.n : '';
+                            valHTML = `<div class="inline-flex flex-col items-center justify-center align-middle mx-1 text-sm sm:text-base leading-tight">
+                                            <span class="border-b-[1.5px] border-slate-300 px-2 sm:px-3 pb-1">${multStr}(${innerFormatted})</span>
+                                            <span class="pt-1 text-slate-500">(${bottomFormatted})</span>
+                                        </div>`;
+                        } else if (absF.d === 1) {
                             let multStr = absF.n !== 1 ? absF.n : '';
                             valHTML = `<span class="flex items-center">${multStr}(${innerFormatted})</span>`;
                         } else {
                             let multStr = absF.n !== 1 ? absF.n : '';
                             valHTML = `<div class="inline-flex flex-col items-center justify-center align-middle mx-1 text-sm sm:text-base leading-tight">
-                                            <span class="border-b-2 border-slate-300 px-2 sm:px-3 pb-1">${multStr}(${innerFormatted})</span>
+                                            <span class="border-b-[1.5px] border-slate-300 px-2 sm:px-3 pb-1">${multStr}(${innerFormatted})</span>
                                             <span class="pt-1 text-slate-500">${absF.d}</span>
                                         </div>`;
                         }
@@ -837,7 +1056,9 @@
                             ${record.stepNum > 0 ? `<p class="text-xs sm:text-sm font-medium text-amber-600 mb-2 flex items-center gap-1 sm:gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg> <span class="truncate">${record.action}</span></p>` : ''}
                             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 inline-flex flex-col shadow-sm max-w-full overflow-hidden">
                                 ${intermediateRender}
-                                <span class="font-mono text-base sm:text-lg font-bold flex items-center whitespace-nowrap overflow-x-auto no-scrollbar ${isLast ? 'text-slate-800' : 'text-slate-600'} tracking-wide">${record.eqStr}</span>
+                                <div class="font-mono text-base sm:text-lg font-bold whitespace-nowrap overflow-x-auto no-scrollbar ${isLast ? 'text-slate-800' : 'text-slate-600'} tracking-wide">
+                                    ${record.eqStr}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -845,15 +1066,18 @@
             }).join('');
             
             setTimeout(() => {
-                const historyDiv = ui.historyContainer.parentElement;
-                historyDiv.scrollTop = historyDiv.scrollHeight;
+                const historyDiv = document.getElementById('history-scroll-container');
+                if (historyDiv) historyDiv.scrollTop = historyDiv.scrollHeight;
             }, 50);
 
             checkSolved();
         }
 
-        ui.input.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') parseAndStart();
+        // Add Enter key support for the new visual builder inputs
+        ['lhs-top', 'lhs-bottom', 'rhs-top', 'rhs-bottom'].forEach(id => {
+            document.getElementById(id).addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') parseAndStart();
+            });
         });
     </script>
 </body>
